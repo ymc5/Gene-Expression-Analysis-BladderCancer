@@ -1,0 +1,91 @@
+---
+title: "Step3_4"
+author: "Youngmin Choi"
+date: "2023-12-02"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(reshape2)
+```
+
+```{r}
+# Mean of each column of normal sample CIBERSORT results.
+normal_cibersort<-read.csv("CIBERSORTx_Job3_Results.csv" ,row.names=1)
+normal_cibersort
+```
+
+```{r}
+normal_cellonly <-normal_cibersort[, !names(normal_cibersort) %in% c('P.value','Correlation','RMSE')]
+normal_colmeans <- colMeans(normal_cellonly, na.rm=TRUE)
+normal_mean<-data.frame(Cell_type_Normal=names(normal_colmeans), Mean=normal_colmeans)
+normal_mean_topfive <- normal_mean[order(-normal_mean$Mean),]
+normal_mean_topfive<-head(normal_mean_topfive,5)
+rownames(normal_mean_topfive) <- NULL
+print(normal_mean_topfive)
+
+
+```
+
+```{r}
+# Mean of each column of BC sample CIBERSORT results.
+BC_cibersort<-read.csv("CIBERSORTx_Job4_Results.csv" ,row.names=1)
+BC_cibersort
+```
+
+
+
+
+```{r}
+BC_cellonly <-BC_cibersort[, !names(BC_cibersort) %in% c('P.value','Correlation','RMSE')]
+BC_colmeans <- colMeans(BC_cellonly, na.rm=TRUE)
+BC_mean<-data.frame(Cell_type_BC=names(BC_colmeans), Mean=BC_colmeans)
+BC_mean_topfive <- BC_mean[order(-BC_mean$Mean),]
+BC_mean_topfive<-head(BC_mean_topfive,5)
+rownames(BC_mean_topfive) <- NULL
+print(BC_mean_topfive)
+
+
+```
+
+
+### Bar graph
+```{r}
+source("functionAvgBarPlot.R")
+
+# calling function for normal 
+objectPlotNormal <- functionAvgBarPlot(
+  cibersortData=normal_cibersort, 
+  outputFileName = 'normal_cibersort_AvgBarPlot',
+  outputFolderName = 'output',
+  title1='Normal Average Bar Plot',
+  num1=22
+)
+
+# insert object into the Rmarkdown document
+objectPlotNormal
+
+
+```
+
+```{r}
+# calling function for BC invasive
+objectPlotBC <- functionAvgBarPlot(
+  cibersortData=BC_cibersort, 
+  outputFileName = 'BC_Invasive_cibersort_AvgBarPlot',
+  outputFolderName = 'output',
+  title1='BC Invasive Average Bar Plot',
+  num1=22
+)
+
+# insert object into the Rmarkdown document
+objectPlotBC
+
+```
+
+
+

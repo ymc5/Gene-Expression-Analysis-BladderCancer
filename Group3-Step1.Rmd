@@ -1,0 +1,186 @@
+---
+title: "7003 Final Project Step 1"
+author: "Youngmin Choi"
+date: "2023-11-22"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1. Objective/Goal
+* To explore molecular changes at different stages of cancer in comparison to normal tissue.
+* For this step (Step1), gene expression data from normal tissue and invasive type of primary bladder cancer patients were compared.
+* After performing t-test on these samples, differentially expressed genes (DEGs) were sorted and filtered for further step 2 analysis, which is the enrichment analysis. 
+
+## 2. Analysis Steps
+
+### 1) Check clinical and molecular (gene) data.
+* There are 233 objects in the clinical data, which means 233 patients (and normal tissue) were included for this analysis.
+
+```{r}
+# Clinical data (patient data) imported.
+clinicalData<-read.csv("input/20191105_BC_ClinData_233rows.csv")
+colnames(clinicalData)
+```
+
+* 43148 objects (genes) are present in this data with 233 variables, representing 233 samples. 
+
+```{r}
+# Molecular data (gene expression data) imported. 
+
+geneData <- read.csv(file='input/20191105_BC_GeneExpData_withAnno_233.tsv', sep='\t', stringsAsFactors = F)
+
+head(geneData[,c(2:10)])
+
+```
+
+
+### 2) Clean/Filter data & Identify groups to be compared
+
+* Control group is the sample group with the cancer type column value as 'Normal bladder mucosae'.
+* The number of samples in the control group is 10.
+* Comparison group is the sample group with the cancer type column value as 'Primary_BC_Invasive'.
+* The number of samples in the comparison group is 62. 
+
+```{r}
+library(dplyr)
+
+studyGroup<-clinicalData %>% filter (PrimaryBladderCancerType %in% c('Normal bladder mucosae','Primary_BC_Invasive'))
+head(studyGroup)
+
+```
+
+```{r}
+controlGroup <- studyGroup %>% filter (PrimaryBladderCancerType == 'Normal bladder mucosae')
+head(controlGroup)
+```
+
+
+
+```{r}
+comparisonGroup <- studyGroup %>% filter (PrimaryBladderCancerType == 'Primary_BC_Invasive')
+head(comparisonGroup)
+```
+
+* Sample id (GSMid column) from the control group was filtered and gene data with the according GSMid were filtered as well. 
+
+```{r}
+whichIDs <- which(colnames(geneData) %in% controlGroup$GSMid)
+controlGene <- geneData[ ,whichIDs]
+head(controlGene[,2:5]) # 43148 objects with 10 variables. 
+```
+
+* Sample id (GSMid column) from the comparison group was filtered and gene data with the according GSMid were filtered as well. 
+
+```{r}
+whichIDs_comparison <- which(colnames(geneData) %in% comparisonGroup$GSMid)
+comparisonGene <- geneData[ ,whichIDs_comparison]
+head(comparisonGene[,2:5]) # 43148 genes with 62 variables. 
+
+```
+
+### 3) Sanity Check
+
+* Sanity check was conducted by comparing the GSMid column values and the Gene samples. 
+
+```{r}
+controlGroup$GSMid == colnames(controlGene)
+comparisonGroup$GSMid == colnames(comparisonGene)
+# All data matching confirmed. 
+```
+
+* In addition, the GSMid from both control group and comparison group patient data as well as gene data were compared with each other by creating an output file with sample id information.
+* GSMid were cross-checked and confirmed to be identical. 
+
+```{r}
+write.table(controlGroup$GSMid, file="output/YoungminChoi_controlGroupGSMid.tsv", sep="\t", quote=F)
+write.table(comparisonGroup$GSMid, file="output/YoungminChoi_comparisonGroupGSMid.tsv", sep="\t", quote=F)
+write.table(colnames(controlGene), file="output/YoungminChoi_controlGeneGSMid.tsv", sep="\t", quote=F)
+write.table(colnames(comparisonGene), file="output/YoungminChoi_comparisonGeneGSMid.tsv", sep="\t", quote=F)
+```
+
+
+### 4) Preparing Data for T-Test
+
+```{r}
+knitr::kable(head(controlGene[1:5,1:5]))
+knitr::kable(head(comparisonGene[1:5,1:5]))
+```
+
+* Checked if there are any missing data. 
+
+```{r}
+any(is.na(controlGene)) # No missing data.
+
+```
+
+```{r}
+any(is.na(comparisonGene)) # No missing data. 
+
+```
+
+
+### 5) Call Function for T-Test
+
+
+```{r}
+source("fnTTest.R")
+
+results1 = fnTTest(baseGroup=controlGene,
+                   compGroup=comparisonGene,
+                   testName="TTest_Final",
+                   baseGroupName="control",
+                   compGroupName="Invasive",
+                   folderName="output")
+```
+
+
+### 6) T-Test Result File Generation 
+
+* After t-test was conducted, the results were generated as a csv file in the output folder. 
+* For further analysis, the results were sorted based on P-values.
+* After sorting, the result was filtered with the following criteria. i) FDR <= 0.0001 ii) fold change <= 1.5
+* This gave 735 genes for further analysis. 
+
+```{r}
+ttestResults <- read.csv(file="output/TTest_Final_Invasive_(Comp).vs._control_(Base).TTest.csv")
+ttestResultsSorted <- dplyr::arrange(ttestResults, Pvalue)
+
+sortedGene <- which(ttestResultsSorted$FDR <= 0.0001 & ttestResultsSorted$SignedFC <= 1.5)
+
+sortedTTestResult <- ttestResultsSorted[sortedGene, ] 
+colnames(sortedTTestResult) 
+
+# Split gene annotations to include only gene names. 
+geneBefore <- sortedTTestResult$Feature
+split_names <- strsplit(geneBefore, "\\|")
+new_name <- sapply(split_names, function(x) x[2])
+sortedTTestResult$Feature <- new_name # Changed gene annotations to include only gene names
+
+write.csv(x=sortedTTestResult, file="output/YoungminChoi_7003Final_DEGs.csv", quote=F,  row.names=FALSE)
+
+```
+
+
+* For enrichment analysis, further cleaning process was conducted as below. 
+* First, missing values were removed. 
+* Next, duplicate genes were merged into 1 distinct gene. 
+* The final result was 633 genes. 
+
+```{r}
+shortlist_DEG <-read.csv("output/YoungminChoi_7003Final_DEGs.csv")
+shortlist_DEG <- na.omit(shortlist_DEG) # Missing values removed. 
+```
+
+```{r}
+shortlist_DEG_duplicates <- duplicated(shortlist_DEG$Feature)
+shortlist_DEG_clean <- shortlist_DEG[!shortlist_DEG_duplicates, ]
+write.csv(x=shortlist_DEG_clean, file="output/YoungminChoi_7003Final_DEGs_clean.csv", quote=F,  row.names=FALSE)
+# Duplicate gene names removed. 
+```
+
+## 4. Summary
+- T-Test analysis was conducted to find out which genes are differentially expressed between the normal sample and sample from primary invasive bladder cancer patients. 
+* After T-test and data cleaning, a total of 633 genes were filtered for further analysis. 

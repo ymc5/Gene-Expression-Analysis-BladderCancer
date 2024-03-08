@@ -1,0 +1,55 @@
+---
+title: "7003 Final Project Step 2"
+author: "Youngmin Choi"
+date: "2023-11-23"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1. Objective/Goal
+* To explore molecular changes at different stages of cancer in comparison to normal tissue.
+* For this step (Step2), DEG list from Step 1 was used for enrichment analysis. 
+
+## 2. Analysis Steps
+
+### 1) Import Packages & File For EnrichR Analysis
+
+```{r}
+library(enrichR)
+library(openxlsx)
+
+dbs <- enrichR::listEnrichrDbs()
+
+dblist <- read.csv(file='input/2023-EnrichR-Databases.txt', header=F, stringsAsFactors = F)
+head(dblist)
+```
+
+
+### 2) Import T-Test Result (Filtered DEG list)
+
+```{r}
+sortedTTestResult <- read.csv('output/YoungminChoi_7003Final_DEGs_clean.csv')
+head(sortedTTestResult)
+```
+
+
+### 3) Load Database & Call Function to Run Enrichment 
+
+```{r}
+geneListFinal <-sortedTTestResult$Feature
+
+outputFilename <- 'output/YoungminChoi_7003Final_EnrichR.xlsx'
+source(file='functionEnrichment.R')
+functionEnrichment(dblist, geneListFinal, outputFilename)
+```
+
+## 3. Summary
+* For Step 2, enrichment analysis was conducted.
+* In the final output file, pathways from various database sources were included. 
+
+
+
+
